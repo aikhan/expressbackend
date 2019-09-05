@@ -1,4 +1,6 @@
 import jsonwebtoken from 'jsonwebtoken';
+import request from 'request';
+import requestPromise from 'request-promise';
 
 const user = {
 	id: 1,
@@ -6,6 +8,8 @@ const user = {
 	email: 'asad@gmail.com',
 	password: '111'
 };
+let exchangeRates;
+getAllCurrencyConversions();
 
 const routes = app => {
 	app
@@ -13,7 +17,7 @@ const routes = app => {
 		.get((req, res) => res.send('GET request successfull!!!'))
 
 		.post((req, res) => {
-			if (req.body.username === 'asad' && req.body.password === '111') {
+			if (req.body.username === user.username && req.body.password === '111') {
 				jsonwebtoken.sign({ user }, 'secretkey', (err, token) => {
 					res.json({ token });
 				});
@@ -27,31 +31,40 @@ const routes = app => {
 		.get(
 			(req, res, next) => {
 				const bearerHeader = req.headers['authorization'];
-				// Check if bearer is undefined
 				if (typeof bearerHeader !== 'undefined') {
-					// Split at the space
 					const bearer = bearerHeader.split(' ');
-					// Get token from array
 					const bearerToken = bearer[1];
-					// Set the token
 					req.token = bearerToken;
-					// Next middleware
 					next();
 				} else {
-					// Forbidden
+					console.log('Not authorized');
 					res.sendStatus(403);
 				}
 			},
 			(req, res, next) => {
-				jsonwebtoken.verify(req.token, 'secretkey', (err, authData) => {
-					if (err) {
-						res.sendStatus(403);
-					} else {
-						res.json({
-							message: 'Post created...',
-							authData
-						});
-					}
+				callRestCounries(result => {
+					jsonwebtoken.verify(req.token, 'secretkey', (err, authData) => {
+						if (err) {
+							res.sendStatus(403);
+						} else {
+							let countryArray = JSON.parse(result);
+							res.send(
+								countryArray.map(country => {
+									return {
+										name: country.name,
+										population: country.population,
+										currencies: country.currencies.map(currency => {
+											return Object.assign(
+												//mutate the existing currency array to add rate object //spread operator is failing
+												{ rate: exchangeRates[currency.code] },
+												currency
+											);
+										})
+									};
+								})
+							);
+						}
+					});
 				});
 			}
 		)
@@ -59,5 +72,42 @@ const routes = app => {
 			res.send('POST request successfull Countries endpoint')
 		);
 };
+
+function callRestCounries(cb) {
+	request.get(
+		{
+			url: 'https://restcountries.eu/rest/v2/all',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		},
+		function(error, response, body) {
+			// if (response.statusCode >= 400 || error) { this can crash
+			if (!error && response.statusCode == 200) {
+				console.log('body is ' + response.statusCode);
+				cb(body);
+			} else {
+				console.log('Error connecting countries endpoint');
+			}
+		}
+	);
+}
+
+function getAllCurrencyConversions() {
+	requestPromise({
+		url:
+			'http://data.fixer.io/api/latest?access_key=65a46a3c3c9c4a87ab07b6a72500b80d&base=EUR',
+		headers: {
+			'Content-Type': 'application/json'
+		}
+	})
+		.then(body => {
+			exchangeRates = JSON.parse(body).rates;
+			console.log('response is $$' + JSON.stringify(exchangeRates));
+		})
+		.catch(error => {
+			console.log('Error from exchange ' + error);
+		});
+}
 
 export default routes;
