@@ -1,11 +1,12 @@
 import express from 'express';
 import routes from './src/routes/countriesExchangeRoutes';
 import bodyParser from 'body-parser';
+import cors from 'cors';
 
 const app = express();
-app.use(bodyParser.json());
+app.use([bodyParser.json(), cors()]);
 
-const PORT = 3001;
+const PORT = 8080;
 
 routes(app);
 

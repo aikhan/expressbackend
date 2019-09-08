@@ -10,6 +10,10 @@ const user = {
 };
 let exchangeRates;
 getAllCurrencyConversions();
+/*
+	Ideally countries should be fetched at this stage because they're static and exchange rate fetched at each call if we want a real time system
+	Else we can fetch and cache information for a predefined period and fetch after pre defined time.
+*/
 
 const routes = app => {
 	app
@@ -22,7 +26,9 @@ const routes = app => {
 					res.json({ token });
 				});
 			} else {
-				res.send('Invalid username or password');
+				return res.status(401).send({
+					message: 'Invalid username or password'
+				});
 			}
 		});
 
@@ -30,15 +36,14 @@ const routes = app => {
 		.route('/cntryexch')
 		.get(
 			(req, res, next) => {
-				const bearerHeader = req.headers['authorization'];
+				const bearerHeader = req.headers.authorization;
 				if (typeof bearerHeader !== 'undefined') {
 					const bearer = bearerHeader.split(' ');
 					const bearerToken = bearer[1];
 					req.token = bearerToken;
 					next();
 				} else {
-					console.log('Not authorized');
-					res.sendStatus(403);
+					return res.status(403);
 				}
 			},
 			(req, res, next) => {
